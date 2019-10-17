@@ -21,9 +21,9 @@ library(janitor) #cleaning column names
 library(readxl) #Read excel files
 
 if (sessionInfo()$platform %in% c("x86_64-redhat-linux-gnu (64-bit)", "x86_64-pc-linux-gnu (64-bit)")) {  
-  data_folder <- "/PHI_conf/ScotPHO/HfA/data/"
+  data_folder <- "/PHI_conf/ScotPHO/HfA/Data/"
 } else {
-  data_folder <- "//stats/ScotPHO/HfA/data/"
+  data_folder <- "//stats/ScotPHO/HfA/Data/"
 }
 
 ###############################################.
@@ -63,6 +63,15 @@ who_data <- do.call(bind_rows, lapply(files, read_csv, col_types = cols(.default
 table(who_data$yes_no) # few cases, not sure what to do with them
 
 ###############################################.
+# Check what indicators available for UK 
+ind_uk <- who_data %>% 
+  mutate(gbr = case_when(country_region == "GBR" ~ 1,
+                         TRUE ~ 0)) %>% 
+  select(measure_code, gbr) %>% unique() %>% 
+  group_by(measure_code) %>% 
+  summarise(gbr = max(gbr))
+
+###############################################.
 # Preparing geography lookup 
 # Reading country group mappings from metadata file
 country_groupings <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), 
@@ -88,6 +97,8 @@ url_indicators <- "http://dw.euro.who.int/api/v3/measures?filter=DATA_SOURCE:HFA
 #read data into JSON object
 list_indicators <- readLines(url_indicators, encoding="UTF-8", warn=F)
 list_indicators <- fromJSON(list_indicators,simplifyDataFrame = TRUE)
+
+list_indicators <- left_join(list_indicators, ind_uk, by = c("code" = "measure_code"))
 
 write_csv(list_indicators, paste0(data_folder,"indicators_from_WHO_HFA.csv"))
 
