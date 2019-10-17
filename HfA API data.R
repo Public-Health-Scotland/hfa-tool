@@ -5,6 +5,8 @@
 #   downloading and unzipping zip
 # What to do with Yes/NO cases, no clear explanation on metadata
 # move filepaths so things get saved in the hfa data folder and not in the project
+# do I need the indicator metadat from the api(update dates)
+# What is the data mask column?
 
 ############################.
 ## Filepaths, packages ----
@@ -54,7 +56,7 @@ View(file.info(files,  extra_cols = TRUE))
 # reads the data and combines it
 #File 3 has additional columns "PLACE_RESIDENCE" and "YES_NO"
 who_data <- do.call(bind_rows, lapply(files, read_csv, col_types = cols(.default = "c"))) %>% 
-  setNames(tolower(names(.))) %>% #names to lower case
+  clean_names() %>% #names to lower case
   # Excluding urban and rural cuts
   filter(!(place_residence %in% c("RURAL", "URBAN"))) %>% 
   mutate_at(c("year", "value"), as.numeric) %>% 
@@ -92,60 +94,28 @@ list_indicators <- fromJSON(list_indicators,simplifyDataFrame = TRUE)
 
 write_csv(list_indicators, "data/indicators_from_WHO_HFA.csv")
 
-
-#Read in Metadata file
-
-#Indicator Labels
+#Reading different parts of information about the indicators
 indlabels <- read_excel("data/HFA Metadata.xlsx", sheet = "Labels", range = "A2:B613") %>% clean_names()
 indunittype <- read_excel("data/HFA Metadata.xlsx", sheet = "Labels", range = "A616:B667")  %>% clean_names()
 indclass <- read_excel("data/HFA Metadata.xlsx", sheet = "Classifications") %>% clean_names()
 inddesc <- read_excel("data/HFA Metadata.xlsx", sheet = "Measure list") %>% clean_names()
 
-
+# Merging together to produce indicator lookup
 indicator_lookup <- left_join(indlabels, inddesc, by = c("code" = "measure_code"))
 indicator_lookup <- left_join(indicator_lookup, indclass, by = c("code" = "measure_code"))
 indicator_lookup <- left_join(indicator_lookup, indunittype, by =  "unit_type")
 
-# Merge with data from API?
+saveRDS(indicator_lookup, "data/indicator_lookup.rds")
 
-saveRDS(ind_lookup, "data/indicator_lookup.rds")
+###############################################.
+# Merging WHO data with metadata 
+who_data <- left_join(who_data, geo_lookup, by=c("country_region" = "code"))
+who_data <- left_join(who_data, indicator_lookup, by=c("measure_code" = "code"))
 
-##########################################################################################################
-
-
-#HfANonScot <- merge(x=HfANonScot, y=CountryDetails, by.x = "COUNTRY_REGION",  by.y = "Code", all.x = TRUE)
-
-
-#Merging Country Details to Non-Scot data
-
-#Selecting only the columns to be matched on
-CountryDetails <- CountryDetails %>%
-  select("Code", "Short_Name" = `Short name`, "Full_Name" = `Full name`)
-
-HfANonScot <- left_join(HfANonScot, CountryDetails, by = c("COUNTRY_REGION" = "Code"))
-#HfANonScot <- HfANonScot %>%
-#  mutate(CountryFullName = CountryDetails$"Full name"[CountryDetails$"Code" == HfANonScot$COUNTRY_REGION])
-
-HfANonScot <-  mutate (HfANonScot, IsCtryGrp = (HfANonScot$COUNTRY_REGION %in% c("WHO_EURO","EU_MEMBERS","EU_BEFORE_MAY2004","EU_AFTER_MAY2004","CIS","CARINFONET","SEEHN","NORDIC","SMALL")))
-
-#To Do - Country group is an array by Country and 9 groups
-    #Merging Country Group Details to Non-Scot data
-    #Selecting only the columns to be matched on
-    CountryGrpDetails <- CountryGrpDetails %>%
-       select("Code", "CountryGrpShrtName" = `Short name`, "CountryGrpFullName" = `Full name`)
-     
-     HfANonScot <- left_join(HfANonScot, CountryGrpDetails, by = c("COUNTRY_REGION" = "Code"))
-
-
-#Merging Indicator details to Non-Scot data
-
-#Should only join on "Measure code"
-HfANonScot <- left_join(HfANonScot, IndDesc)
-
-
-
-saveRDS(HfANonScot,"data/HFA2018NonScotJoined")
-
-
+who_data <- who_data %>% # Taking out some columns
+  select(-c(yes_no:short_name, who_euro:small, unit_type, data_mask,
+            externid:classification, reference_link))
   
+saveRDS(who_data, "data/WHO_HFA_data.rds")
+
   ##END
