@@ -1,4 +1,5 @@
-# Read in Health for All dataset from https://gateway.euro.who.int/en/api/
+# Extract data and metadata from WHO Europe health for all database
+# https://dw.euro.who.int/
 
 # TODO:
 # Figure out if there is a better way through the API rather than 
@@ -7,11 +8,11 @@
 # move filepaths so things get saved in the hfa data folder and not in the project
 # do I need the indicator metadat from the api(update dates)
 # What is the data mask column?
+# Does the exclusion of urban and rural makes sense
 
 ############################.
 ## Filepaths, packages ----
 ############################.
-
 library(httr) #to connect to API
 library(jsonlite) # to parse data file
 library(dplyr) #data manipulation
@@ -19,13 +20,10 @@ library(readr) #csv writing/reading
 library(janitor) #cleaning column names
 library(readxl) #Read excel files
 
-
 if (sessionInfo()$platform %in% c("x86_64-redhat-linux-gnu (64-bit)", "x86_64-pc-linux-gnu (64-bit)")) {  
   data_folder <- "/PHI_conf/ScotPHO/HfA/data/"
-  lookups <- "/PHI_conf/ScotPHO/HfA/HFA2018/Dev_work_tabs/HfA/" 
 } else {
   data_folder <- "//stats/ScotPHO/HfA/data/"
-  lookups <- "//stats/ScotPHO/HfA/HFA2018/Dev_work_tabs/HfA/" 
 }
 
 ###############################################.
@@ -45,11 +43,11 @@ url_hfa <- who_hfa_metadata[["download_url"]]
 # Download zip file with all data and unzip
 temp <- tempfile() #create temporary folder
 download.file(url_hfa, temp)
-unzip(temp, exdir = "./data/") #unzip in data folder
+unzip(temp, exdir = data_folder) #unzip in data folder
 unlink(temp) #delete temporary folder
 
-#Finds all the csv files in the shiny folder
-files <-  list.files(path = "./data", pattern = "table", full.names = TRUE)
+#Finds all the csv files containing data in the right format
+files <-  list.files(path = data_folder, pattern = "table", full.names = TRUE)
 # To check dates of update of each file and who did it
 View(file.info(files,  extra_cols = TRUE))
 
@@ -66,23 +64,22 @@ table(who_data$yes_no) # few cases, not sure what to do with them
 
 ###############################################.
 # Preparing geography lookup 
-
 # Reading country group mappings from metadata file
-country_groupings <- read_excel("data/HFA Metadata.xlsx", 
+country_groupings <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), 
                          sheet = "Country groups mapping", skip = 2,
                          col_names = c("short_name", "code", "who_euro", "eu_members", 
                                        "eu_before_may2004", "eu_after_may2004",
                                        "cis","carinfonet","seehn","nordic", 
                                        "small"))
 # Read country codes from metadata file
-geo_lookup <- read_excel("data/HFA Metadata.xlsx", sheet = "Countries") %>% 
+geo_lookup <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Countries") %>% 
   clean_names #column names in lower case and with underscore
 
 # Merge them together
 geo_lookup <- left_join(geo_lookup, country_groupings, by = c("short_name", "code"))
 
-saveRDS(geo_lookup, "data/geo_lookup.rds")
-geo_lookup <- readRDS("data/geo_lookup.rds")
+saveRDS(geo_lookup, paste0(data_folder, "geo_lookup.rds"))
+geo_lookup <- readRDS(paste0(data_folder, "geo_lookup.rds"))
 
 ###############################################.
 # Preparing indicator lookup 
@@ -92,20 +89,21 @@ url_indicators <- "http://dw.euro.who.int/api/v3/measures?filter=DATA_SOURCE:HFA
 list_indicators <- readLines(url_indicators, encoding="UTF-8", warn=F)
 list_indicators <- fromJSON(list_indicators,simplifyDataFrame = TRUE)
 
-write_csv(list_indicators, "data/indicators_from_WHO_HFA.csv")
+write_csv(list_indicators, paste0(data_folder,"indicators_from_WHO_HFA.csv"))
 
 #Reading different parts of information about the indicators
-indlabels <- read_excel("data/HFA Metadata.xlsx", sheet = "Labels", range = "A2:B613") %>% clean_names()
-indunittype <- read_excel("data/HFA Metadata.xlsx", sheet = "Labels", range = "A616:B667")  %>% clean_names()
-indclass <- read_excel("data/HFA Metadata.xlsx", sheet = "Classifications") %>% clean_names()
-inddesc <- read_excel("data/HFA Metadata.xlsx", sheet = "Measure list") %>% clean_names()
+indlabels <- read_excel(paste0(data_folder, "HFA Metadata.xlsx", sheet = "Labels", range = "A2:B613")) %>% clean_names()
+indunittype <- read_excel(paste0(data_folder, "HFA Metadata.xlsx", sheet = "Labels", range = "A616:B667"))  %>% clean_names()
+indclass <- read_excel(paste0(data_folder, "HFA Metadata.xlsx", sheet = "Classifications")) %>% clean_names()
+inddesc <- read_excel(paste0(data_folder, "HFA Metadata.xlsx", sheet = "Measure list")) %>% clean_names()
 
 # Merging together to produce indicator lookup
 indicator_lookup <- left_join(indlabels, inddesc, by = c("code" = "measure_code"))
 indicator_lookup <- left_join(indicator_lookup, indclass, by = c("code" = "measure_code"))
 indicator_lookup <- left_join(indicator_lookup, indunittype, by =  "unit_type")
 
-saveRDS(indicator_lookup, "data/indicator_lookup.rds")
+saveRDS(indicator_lookup, paste0(data_folder, "indicator_lookup.rds"))
+indicator_lookup <- readRDS(paste0(data_folder,"indicator_lookup.rds"))
 
 ###############################################.
 # Merging WHO data with metadata 
@@ -116,6 +114,7 @@ who_data <- who_data %>% # Taking out some columns
   select(-c(yes_no:short_name, who_euro:small, unit_type, data_mask,
             externid:classification, reference_link))
   
-saveRDS(who_data, "data/WHO_HFA_data.rds")
+saveRDS(who_data, paste0(data_folder, "WHO_HFA_data.rds"))
+who_data <- readRDS(paste0(data_folder,"WHO_HFA_data.rds"))
 
   ##END
