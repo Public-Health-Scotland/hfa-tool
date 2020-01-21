@@ -39,12 +39,12 @@ function(input, output, session) {
   
   ###############################################.
   # Indicator definitions
-  defs_data_trend <- reactive({ind_lookup %>% subset(input$indic_trend == label)})
+  defs_data_trend <- reactive({ind_lookup %>% subset(input$indic_trend == ind_name)})
   
   output$defs_text_trend <- renderUI({
     
-    HTML(paste(sprintf("<b><u>%s</b></u> <br> %s ", defs_data_trend()$label, 
-                       defs_data_trend()$measure_name), collapse = "<br><br>"))
+    HTML(paste(sprintf("<b><u>%s</b></u> <br> %s ", defs_data_trend()$ind_name, 
+                       defs_data_trend()$description), collapse = "<br><br>"))
   })
   
   #####################.
@@ -53,11 +53,11 @@ function(input, output, session) {
   trend_data <- reactive({ 
     
     who_data %>% 
-      subset(full_name %in% input$country_trend  & 
-               label == input$indic_trend &
+      subset(country_name %in% input$country_trend  & 
+               ind_name == input$indic_trend &
                sex == input$sex_trend) %>% 
       droplevels() %>% 
-      arrange(year, label) #Needs to be sorted by year for Plotly
+      arrange(year, ind_name) #Needs to be sorted by year for Plotly
   })
   
   #####################.
@@ -65,7 +65,7 @@ function(input, output, session) {
   #####################.
   # titles 
   output$title_trend <- renderText(paste0(input$indic_trend))
-  output$subtitle_trend <- renderText(paste0(unique(trend_data()$unit)))                                     
+  output$subtitle_trend <- renderText(paste0(unique(trend_data()$measure_type)))                                     
   
   
   #####################.
@@ -90,29 +90,29 @@ function(input, output, session) {
       trend_palette <- c("#000000", "#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99",
                          "#e31a1c", "#fdbf6f", "#ff7f00", "#cab2d6", "#6a3d9a", "#b15928")
       
-      trend_scale <- c(setNames(trend_palette, unique(trend_data()$full_name)[1:trend_length]))
+      trend_scale <- c(setNames(trend_palette, unique(trend_data()$country_name)[1:trend_length]))
       trend_col <- trend_scale[1:trend_length]
       
       # Same approach for symbols
       symbols_palette <-  c('circle', 'diamond', 'circle', 'diamond', 'circle', 'diamond',
                             'square','triangle-up', 'square','triangle-up', 'square','triangle-up')
-      symbols_scale <- c(setNames(symbols_palette, unique(trend_data()$full_name)[1:trend_length]))
+      symbols_scale <- c(setNames(symbols_palette, unique(trend_data()$country_name)[1:trend_length]))
       symbols_trend <- symbols_scale[1:trend_length]
       
       #Text for tooltip
-      tooltip_trend <- c(paste0(trend_data()$full_name, "<br>", trend_data()$year,
-                                "<br>", paste0(unique(trend_data()$unit)),": ", trend_data()$value))
+      tooltip_trend <- c(paste0(trend_data()$country_name, "<br>", trend_data()$year,
+                                "<br>", paste0(unique(trend_data()$measure_type)),": ", trend_data()$value))
       
       #Creating time trend plot
       trend_plot <- plot_ly(data=trend_data(), x=~year,  y = ~value,
-                            color = ~full_name, colors = trend_col, 
+                            color = ~country_name, colors = trend_col, 
                             text=tooltip_trend, hoverinfo="text", height = 600 ) %>% 
         add_trace(type = 'scatter', mode = 'lines+markers', marker = list(size = 8),
-                  symbol = ~full_name, symbols = symbols_trend) %>% 
+                  symbol = ~country_name, symbols = symbols_trend) %>% 
         #Layout 
         layout(annotations = list(), #It needs this because of a buggy behaviour of Plotly
                margin = list(b = 160, t=5), #to avoid labels getting cut out
-               yaxis = list(title = unique(trend_data()$unit), rangemode="tozero", fixedrange=TRUE,
+               yaxis = list(title = unique(trend_data()$measure_type), rangemode="tozero", fixedrange=TRUE,
                             size = 4, titlefont =list(size=14), tickfont =list(size=14)),
                xaxis = list(title = FALSE, tickfont =list(size=14), tickangle = 270, fixedrange=TRUE),
                font = list(family = '"Helvetica Neue", Helvetica, Arial, sans-serif'),

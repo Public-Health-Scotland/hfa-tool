@@ -28,10 +28,9 @@ library(plotly)
 who_data <- readRDS("data/WHO_HFA_data.rds")
 geo_lookup <- readRDS("data/geo_lookup.rds")
 ind_lookup <- readRDS("data/indicator_lookup.rds")
-# Need definitions
 
-indicator_list <- unique(who_data$measure_name)
-country_list <- sort(unique(who_data$full_name))
+indicator_list <- unique(who_data$ind_name)
+country_list <- sort(unique(who_data$country_name))
 sex_list <- unique(who_data$sex)
 
 ##########.
