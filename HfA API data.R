@@ -19,6 +19,7 @@ library(dplyr) #data manipulation
 library(readr) #csv writing/reading
 library(janitor) #cleaning column names
 library(readxl) #Read excel files
+library(stringi) #for string manipulation
 
 if (sessionInfo()$platform %in% c("x86_64-redhat-linux-gnu (64-bit)", "x86_64-pc-linux-gnu (64-bit)")) {  
   data_folder <- "/PHI_conf/ScotPHO/HfA/Data/"
@@ -48,7 +49,7 @@ unlink(temp) #delete temporary folder
 
 #Finds all the csv files containing data in the right format
 files <-  list.files(path = data_folder, pattern = "table", full.names = TRUE)
-# To check dates of update of each file and who did it
+# To check files on folder
 View(file.info(files,  extra_cols = TRUE))
 
 # reads the data and combines it
@@ -58,7 +59,8 @@ who_data <- do.call(bind_rows, lapply(files, read_csv, col_types = cols(.default
   # Excluding urban and rural cuts
   filter(!(place_residence %in% c("RURAL", "URBAN"))) %>% 
   mutate_at(c("year", "value"), as.numeric) %>% 
-  select(-place_residence)
+  select(-place_residence) %>% 
+  rename(ind_code =measure_code, country_code = country_region)
   
 table(who_data$yes_no) # few cases, not sure what to do with them
 
@@ -87,6 +89,11 @@ geo_lookup <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Coun
 # Merge them together
 geo_lookup <- left_join(geo_lookup, country_groupings, by = c("short_name", "code"))
 
+# Formatting 
+geo_lookup <- geo_lookup %>% 
+  rename(country_code = code, country_name = short_name) %>% 
+  select(-c(iso_2:who_code, full_name))
+
 saveRDS(geo_lookup, paste0(data_folder, "geo_lookup.rds"))
 geo_lookup <- readRDS(paste0(data_folder, "geo_lookup.rds"))
 
@@ -103,29 +110,73 @@ list_indicators <- left_join(list_indicators, ind_uk, by = c("code" = "measure_c
 write_csv(list_indicators, paste0(data_folder,"indicators_from_WHO_HFA.csv"))
 
 #Reading different parts of information about the indicators
-indlabels <- read_excel(paste0(data_folder, "HFA Metadata.xlsx", sheet = "Labels", range = "A2:B613")) %>% clean_names()
-indunittype <- read_excel(paste0(data_folder, "HFA Metadata.xlsx", sheet = "Labels", range = "A616:B667"))  %>% clean_names()
-indclass <- read_excel(paste0(data_folder, "HFA Metadata.xlsx", sheet = "Classifications")) %>% clean_names()
-inddesc <- read_excel(paste0(data_folder, "HFA Metadata.xlsx", sheet = "Measure list")) %>% clean_names()
+indlabels <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Labels", range = "A2:B613") %>% clean_names()
+indunittype <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Labels", range = "A616:B667") %>% clean_names()
+indclass <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Classifications") %>% clean_names()
+indunit <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Measure list") %>% clean_names()
+inddesc <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Measure notes") %>% 
+  clean_names() %>% filter(is.na(country_code)) #only general descriptions/notes
 
 # Merging together to produce indicator lookup
 indicator_lookup <- left_join(indlabels, inddesc, by = c("code" = "measure_code"))
+indicator_lookup <- left_join(indicator_lookup, indunit, by = c("code" = "measure_code"))
 indicator_lookup <- left_join(indicator_lookup, indclass, by = c("code" = "measure_code"))
 indicator_lookup <- left_join(indicator_lookup, indunittype, by =  "unit_type")
+
+# Formatting
+indicator_lookup <- indicator_lookup %>% 
+  rename(ind_name =label, description = note, domain = category, 
+         measure_type = unit, ind_code = code) %>% 
+  select(ind_code, ind_name, description, domain, measure_type)
 
 saveRDS(indicator_lookup, paste0(data_folder, "indicator_lookup.rds"))
 indicator_lookup <- readRDS(paste0(data_folder,"indicator_lookup.rds"))
 
 ###############################################.
 # Merging WHO data with metadata 
-who_data <- left_join(who_data, geo_lookup, by=c("country_region" = "code"))
-who_data <- left_join(who_data, indicator_lookup, by=c("measure_code" = "code"))
+who_data <- left_join(who_data, geo_lookup, by="country_code")
+who_data <- left_join(who_data, indicator_lookup, by="ind_code")
 
 who_data <- who_data %>% # Taking out some columns
-  select(-c(yes_no:short_name, who_euro:small, unit_type, data_mask,
-            externid:classification, reference_link))
+  select(-c(ind_code, country_code, yes_no, who_euro:small, description, domain))
   
 saveRDS(who_data, paste0(data_folder, "WHO_HFA_data.rds"))
 who_data <- readRDS(paste0(data_folder,"WHO_HFA_data.rds"))
+
+who_data2 <- who_data %>% 
+  mutate(ind_name2= grepl(", by sex", ind_name, fixed=TRUE))
+
+
+patterns_change <- c(" (age-standardized death rate)", ", per 100 000", " per 100 000",
+                     " per 1000 population",
+                     ", by sex", ", males", ", females", ", female", 
+                     "Age-standardized p", "Crude d")
+
+
+who_data3 <- who_data %>% 
+  mutate(ind_basename = stri_replace_all_fixed(ind_name, 
+                                              pattern =patterns_change, 
+                                               replacement = c(rep("", 8), "P", "D"), 
+                                              vectorize_all = FALSE),
+         test =  case_when(ind_name != ind_basename ~ T,
+                           TRUE ~ F))
+
+who_data3 <- who_data3 %>% 
+  filter(test == T)
+
+# The idea is that these indicators we could select only the overall ones, but some exceptions
+# filter by Endocrine/nutrition/metabolic disease to see problems
+# also External causes of injury and poisoning, 
+test <- who_data3 %>% select(ind_name, ind_basename, sex) %>% unique() %>% 
+  group_by(ind_name, ind_basename) %>% count()
+
+###############################################.
+## Scotland data ----
+###############################################.
+
+
+
+
+
 
   ##END
