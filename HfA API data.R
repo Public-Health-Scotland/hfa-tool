@@ -174,6 +174,8 @@ test <- who_data3 %>% select(ind_name, ind_basename, sex) %>% unique() %>%
 ## Scotland data ----
 ###############################################.
 
+scot_data <- read_excel(paste0(data_folder, "HFA19UK_Scotland_completed.xlsx"), 
+                        sheet = "HFA19GB_Scotland", range = "A2:AZ164") %>% clean_names()
 
 
 
