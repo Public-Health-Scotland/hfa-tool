@@ -9,6 +9,8 @@
 # do I need the indicator metadat from the api(update dates)
 # What is the data mask column?
 # Does the exclusion of urban and rural makes sense
+# Probabbly the techdoc with definitions will need to include the caveats for all countries
+# which could be shown in a similar way to the ind tech doc of the profiles tool
 
 ############################.
 ## Filepaths, packages ----
@@ -67,11 +69,16 @@ table(who_data$yes_no) # few cases, not sure what to do with them
 ###############################################.
 # Check what indicators available for UK 
 ind_uk <- who_data %>% 
-  mutate(gbr = case_when(country_region == "GBR" ~ 1,
+  mutate(gbr = case_when(country_code == "GBR" ~ 1,
                          TRUE ~ 0)) %>% 
-  select(measure_code, gbr) %>% unique() %>% 
-  group_by(measure_code) %>% 
-  summarise(gbr = max(gbr))
+  select(ind_code, gbr) %>% unique() %>% 
+  group_by(ind_code) %>% 
+  summarise(gbr = max(gbr)) %>% 
+  mutate(index = as.numeric(substr(ind_code,5, 8)),
+         gbr = recode(gbr, "1" = "Yes", "0" = "No")) %>% 
+  arrange(index)
+
+write_csv(ind_uk, paste0(data_folder, "uk_ind_available.csv"))
 
 ###############################################.
 # Preparing geography lookup 
@@ -95,6 +102,7 @@ geo_lookup <- geo_lookup %>%
   select(-c(iso_2:who_code, full_name))
 
 saveRDS(geo_lookup, paste0(data_folder, "geo_lookup.rds"))
+saveRDS(geo_lookup, "data/geo_lookup.rds")
 geo_lookup <- readRDS(paste0(data_folder, "geo_lookup.rds"))
 
 ###############################################.
@@ -117,6 +125,10 @@ indunit <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Measure
 inddesc <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Measure notes") %>% 
   clean_names() %>% filter(is.na(country_code)) #only general descriptions/notes
 
+# notes relative to UK, for information mainly
+desc_uk <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Measure notes") %>% 
+  clean_names() %>% filter(country_code == "GBR") #only general descriptions/notes
+
 # Merging together to produce indicator lookup
 indicator_lookup <- left_join(indlabels, inddesc, by = c("code" = "measure_code"))
 indicator_lookup <- left_join(indicator_lookup, indunit, by = c("code" = "measure_code"))
@@ -130,6 +142,8 @@ indicator_lookup <- indicator_lookup %>%
   select(ind_code, ind_name, description, domain, measure_type)
 
 saveRDS(indicator_lookup, paste0(data_folder, "indicator_lookup.rds"))
+saveRDS(indicator_lookup, "data/indicator_lookup.rds")
+
 indicator_lookup <- readRDS(paste0(data_folder,"indicator_lookup.rds"))
 
 ###############################################.
@@ -141,6 +155,8 @@ who_data <- who_data %>% # Taking out some columns
   select(-c(ind_code, country_code, yes_no, who_euro:small, description, domain))
   
 saveRDS(who_data, paste0(data_folder, "WHO_HFA_data.rds"))
+saveRDS(who_data, "data/WHO_HFA_data.rds")
+
 who_data <- readRDS(paste0(data_folder,"WHO_HFA_data.rds"))
 
 who_data2 <- who_data %>% 
@@ -177,8 +193,9 @@ test <- who_data3 %>% select(ind_name, ind_basename, sex) %>% unique() %>%
 scot_data <- read_excel(paste0(data_folder, "HFA19UK_Scotland_completed.xlsx"), 
                         sheet = "HFA19GB_Scotland", range = "A2:AZ164") %>% clean_names()
 
-
-
+# This is the data for Scotland received from ONS
+scot_data <- scot_data %>% filter(!(is.na(x2017)) | !(is.na(x2018))) %>% 
+  select(indicator_title, pop_group, x2017, x2018)
 
 
   ##END
