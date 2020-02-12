@@ -199,5 +199,6 @@ scot_data <- read_excel(paste0(data_folder, "HFA19UK_Scotland_completed.xlsx"),
 scot_data <- scot_data %>% filter(!(is.na(x2017)) | !(is.na(x2018))) %>% 
   select(indicator_title, pop_group, x2017, x2018)
 
+saveRDS(scot_data, "data/scot_HFA_data.rds")
 
 ##END
