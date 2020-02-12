@@ -5,12 +5,18 @@
 # Figure out if there is a better way through the API rather than 
 #   downloading and unzipping zip
 # What to do with Yes/NO cases, no clear explanation on metadata
-# move filepaths so things get saved in the hfa data folder and not in the project
 # do I need the indicator metadat from the api(update dates)
 # What is the data mask column?
 # Does the exclusion of urban and rural makes sense
 # Probabbly the techdoc with definitions will need to include the caveats for all countries
 # which could be shown in a similar way to the ind tech doc of the profiles tool
+
+# Endocrine, nutritional and metabolic diseases, all ages, per 100 000, by sex (age-standardized death rate)
+# needs to be
+# Endocrine/nutrition/metabolic disease/disorder involving immune mechanism, all ages, per 100 000, by sex (age-standardized death rate)
+# Diabetes, all ages, per 100 000, by sex (age-standardized death rate)
+# needs to be
+# Diabetes mellitus, all ages, per 100 000, by sex (age-standardized death rate)
 
 ############################.
 ## Filepaths, packages ----
@@ -153,38 +159,46 @@ who_data <- left_join(who_data, indicator_lookup, by="ind_code")
 
 who_data <- who_data %>% # Taking out some columns
   select(-c(ind_code, country_code, yes_no, who_euro:small, description, domain))
-  
-saveRDS(who_data, paste0(data_folder, "WHO_HFA_data.rds"))
-saveRDS(who_data, "data/WHO_HFA_data.rds")
 
-who_data <- readRDS(paste0(data_folder,"WHO_HFA_data.rds"))
+# Recoding sex
+who_data <- who_data %>% mutate(sex = recode(sex, "ALL" = "All", 
+                                             "FEMALE" = "Female" ,"MALE" = "Male" ))
 
-who_data2 <- who_data %>% 
-  mutate(ind_name2= grepl(", by sex", ind_name, fixed=TRUE))
-
-
-patterns_change <- c(" (age-standardized death rate)", ", per 100 000", " per 100 000",
+# Patterns in titles to change
+patterns_change <- c(", per 100 000", " per 100 000",
                      " per 1000 population",
                      ", by sex", ", males", ", females", ", female", 
                      "Age-standardized p", "Crude d")
 
+patterns_sex <- c(", by sex", ", males", ", females", ", female", ",females")
 
-who_data3 <- who_data %>% 
+# Cleaning the names and identifying duplicated indicators
+who_data <- who_data %>% 
   mutate(ind_basename = stri_replace_all_fixed(ind_name, 
                                               pattern =patterns_change, 
-                                               replacement = c(rep("", 8), "P", "D"), 
+                                               replacement = c(rep("", 7), "P", "D"), 
                                               vectorize_all = FALSE),
-         test =  case_when(ind_name != ind_basename ~ T,
-                           TRUE ~ F))
+         ind_basesex = stri_replace_all_fixed(ind_name, 
+                                               pattern =patterns_sex, 
+                                               replacement = c(rep("", 5)), 
+                                               vectorize_all = FALSE))
 
-who_data3 <- who_data3 %>% 
-  filter(test == T)
+# Identifiying indicators by sex which information is already in the overall one
+# If they only have one sex and their name has changed is to be excluded.
+ind_to_exclude <- who_data %>% select(ind_name, ind_basesex, sex) %>% unique() %>% 
+  group_by(ind_name, ind_basesex) %>% count() %>% 
+  mutate(changed = case_when(ind_name != ind_basesex ~1 , TRUE ~0),
+         to_excl = case_when(changed == 1 & n == 1 ~1, TRUE ~0)) %>% 
+  filter(changed == 1 & n == 1) %>% pull(ind_name)
 
-# The idea is that these indicators we could select only the overall ones, but some exceptions
-# filter by Endocrine/nutrition/metabolic disease to see problems
-# also External causes of injury and poisoning, 
-test <- who_data3 %>% select(ind_name, ind_basename, sex) %>% unique() %>% 
-  group_by(ind_name, ind_basename) %>% count()
+who_data <- who_data %>% filter(!(ind_name %in% ind_to_exclude)) %>%
+  select(-ind_basesex, -ind_name) %>% 
+  rename(ind_name = ind_basename)
+
+saveRDS(who_data, paste0(data_folder, "WHO_HFA_data.rds"))
+saveRDS(who_data, "data/WHO_HFA_data.rds")
+
+who_data <- readRDS(paste0(data_folder,"WHO_HFA_data.rds"))
 
 ###############################################.
 ## Scotland data ----
