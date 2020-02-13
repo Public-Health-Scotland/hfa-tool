@@ -1,5 +1,3 @@
-
-
 # TODO:
 # Trend might need an option to zoom in... many similar countries+long trends make it difficult
 # Need definitions
@@ -15,11 +13,24 @@
 ############################.
 ##Packages ----
 ############################.
+library(dplyr)
+library(tidyr)
+library(readxl)
+library(janitor)
+library(webshot)
+library(htmlwidgets)
+library(rgdal)
+library(leaflet)
+library(htmltools)
+library(odbc)
+library(leaflet.extras)
 library(shiny)
+library(shinydashboard)
+library(shinyjs)
 library(shinythemes)
+library(jsonlite)
 library(shinyBS)
 library(shinycssloaders)
-library(dplyr)
 library(plotly)
 
 ############################.
@@ -58,4 +69,25 @@ plot_nodata <- function(height_plot = 450) {
     config( displayModeBar = FALSE) # taking out plotly logo and collaborate button
 } 
 
+############################.
+## Map related code ----
+############################.
+
+#load map - used http://mapshaper.org/ to make map less detailed
+shapefile_europe = readOGR(dsn=".", layer="shapefile_europe") # opens up the simpleHB layer of the Shapefile
+shapefile_europe <- spTransform(shapefile_europe, CRS("+init=epsg:4326"))
+
+Indicator <- sort(unique(who_data$ind_name))
+
+Year <- sort(unique(who_data$year))
+
+Sex <- sort(unique(who_data$sex))
+
+# add UK shapefile
+# shapefile_uk = readOGR(dsn=".", layer="infuse_ctry_2011")
+# shapefile_uk <- spTransform(shapefile_uk, CRS("+init=epsg:4326"))
+# 
+# # select scotland only from the UK shape file
+# shapefile_scotland <- subset(shapefile_uk,
+#                              geo_label == "Scotland")
 ##END

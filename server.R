@@ -33,7 +33,7 @@ function(input, output, session) {
   #####################.
   # Reactive controls
   #Controls for chart. Dynamic selection of locality and iz.
-
+  
   
   
   
@@ -141,6 +141,75 @@ function(input, output, session) {
              file = file, zoom = 3)
     })
   
-
+  ###############################################.        
+  #### Mapping ----
+  ###############################################.
   
+  output$mapfunction <- renderLeaflet({
+    leaflet(options = leafletOptions(zoomControl = FALSE,
+                                     minZoom = 1,maxZoom = 8)) %>%
+      addProviderTiles(providers$CartoDB.Positron) %>% 
+      setView(lng=25, lat=54, zoom=3)})
+  
+  # leafletProxy("mapfunction", data = shapefile_scotland) %>%
+  #   addPolygons(weight = 1,
+  #               color = "red")
+  
+  observeEvent(input$IndicatorMap, {
+    
+    if ("Select an indicator" %in% input$IndicatorMap){
+      leaflet("mapfunction")
+    }
+    else {
+      observeEvent(input$YearMap, {
+        
+        if("Select a Year" %in% input$YearMap) {
+          leaflet("mapfunction")
+        } 
+        
+        else{
+          observeEvent(input$SexMap, {
+            
+            if("Select Sex" %in% input$SexMap) {
+              leaflet("mapfunction")
+            } 
+            
+            else {
+              
+              who_data_map <- who_data %>% 
+                filter(ind_name == input$IndicatorMap,
+                       year == input$YearMap)
+              
+              shapefile_europe <- sp::merge(shapefile_europe, who_data_map, by = "NAME_ENGL") 
+              
+              colourpal <- colorNumeric("GnBu", domain = shapefile_europe@data$value)
+              
+              labels = paste(
+                "<b>", shapefile_europe@data$NAME_ENGL, "</b> <br>", shapefile_europe@data$ind_name, "<br>",
+                shapefile_europe@data$value, shapefile_europe@data$measure_type) %>%
+                lapply(htmltools::HTML)
+              
+              
+              leafletProxy("mapfunction", data = shapefile_europe) %>%
+                
+                #leaflet(data = shapefile_europe) %>%
+                addPolygons(weight = 1,
+                            fillColor = ~colourpal(value),
+                            opacity = 1,
+                            color = "white",
+                            highlight = highlightOptions(weight = 5,
+                                                         color = "#666",
+                                                         bringToFront = TRUE),
+                            label = labels,
+                            labelOptions = labelOptions(
+                              style = list("font-weight" = "normal", padding = "3px 8px"),
+                              textsize = "15px",
+                              direction = "auto"))
+              
+            }
+          })
+        }
+      })
+    }
+  })
 } #server end bracker
