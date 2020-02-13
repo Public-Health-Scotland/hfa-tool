@@ -63,7 +63,7 @@ who_data <- do.call(bind_rows, lapply(files, read_csv, col_types = cols(.default
   mutate_at(c("year", "value"), as.numeric) %>% 
   select(-place_residence) %>% 
   rename(ind_code =measure_code, country_code = country_region)
-
+  
 table(who_data$yes_no) # few cases, not sure what to do with them
 
 ###############################################.
@@ -84,11 +84,11 @@ write_csv(ind_uk, paste0(data_folder, "uk_ind_available.csv"))
 # Preparing geography lookup 
 # Reading country group mappings from metadata file
 country_groupings <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), 
-                                sheet = "Country groups mapping", skip = 2,
-                                col_names = c("short_name", "code", "who_euro", "eu_members", 
-                                              "eu_before_may2004", "eu_after_may2004",
-                                              "cis","carinfonet","seehn","nordic", 
-                                              "small"))
+                         sheet = "Country groups mapping", skip = 2,
+                         col_names = c("short_name", "code", "who_euro", "eu_members", 
+                                       "eu_before_may2004", "eu_after_may2004",
+                                       "cis","carinfonet","seehn","nordic", 
+                                       "small"))
 # Read country codes from metadata file
 geo_lookup <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Countries") %>% 
   clean_names #column names in lower case and with underscore
@@ -147,19 +147,17 @@ saveRDS(indicator_lookup, "data/indicator_lookup.rds")
 indicator_lookup <- readRDS(paste0(data_folder,"indicator_lookup.rds"))
 
 ###############################################.
-# Merging WHO data with metadata################################## 
+# Merging WHO data with metadata 
 who_data <- left_join(who_data, geo_lookup, by="country_code")
 who_data <- left_join(who_data, indicator_lookup, by="ind_code")
 
 who_data <- who_data %>% # Taking out some columns
   select(-c(ind_code, country_code, yes_no, who_euro:small, description, domain))
-
+  
 saveRDS(who_data, paste0(data_folder, "WHO_HFA_data.rds"))
 saveRDS(who_data, "data/WHO_HFA_data.rds")
 
 who_data <- readRDS(paste0(data_folder,"WHO_HFA_data.rds"))
-
-###################################################################################
 
 who_data2 <- who_data %>% 
   mutate(ind_name2= grepl(", by sex", ind_name, fixed=TRUE))
@@ -173,9 +171,9 @@ patterns_change <- c(" (age-standardized death rate)", ", per 100 000", " per 10
 
 who_data3 <- who_data %>% 
   mutate(ind_basename = stri_replace_all_fixed(ind_name, 
-                                               pattern =patterns_change, 
+                                              pattern =patterns_change, 
                                                replacement = c(rep("", 8), "P", "D"), 
-                                               vectorize_all = FALSE),
+                                              vectorize_all = FALSE),
          test =  case_when(ind_name != ind_basename ~ T,
                            TRUE ~ F))
 
@@ -199,6 +197,5 @@ scot_data <- read_excel(paste0(data_folder, "HFA19UK_Scotland_completed.xlsx"),
 scot_data <- scot_data %>% filter(!(is.na(x2017)) | !(is.na(x2018))) %>% 
   select(indicator_title, pop_group, x2017, x2018)
 
-saveRDS(scot_data, "data/scot_HFA_data.rds")
 
-##END
+  ##END
