@@ -79,7 +79,6 @@ who_data <- do.call(bind_rows, lapply(files, read_csv, col_types = cols(.default
   
 table(who_data$yes_no) # few cases, not sure what to do with them
 
-
 ###############################################.
 ## Part 2 - Preparing lookups ----
 ###############################################.
@@ -110,7 +109,24 @@ scot_geo <- data.frame(country_code = "SCO", country_name = "Scotland",
   eu_after_may2004 = NA, cis = NA, carinfonet = NA, seehn = NA, 
   nordic = NA, small = "yes")
 
-geo_lookup <- rbind(geo_lookup, scot_geo)
+#country groupings info
+group_geo <- data.frame(country_code = c("WHO_EURO", "NORDIC", "CIS", "EU_MEMBERS", "EU_AFTER_MAY2004", 
+                                         "CARINFONET", "EU_BEFORE_MAY2004", "SEEHN", "SMALL"),
+                       country_name = c("WHO Europe", "Nordic countries", "CIS", "EU Members",
+                                        "EU after May 2004", "CARINFONET", 
+                                        "EU before May 2004", "SEEHN", "Small countries"),
+                       who_euro = c("yes", rep(NA, 8)), 
+                       eu_members = c(rep(NA, 3), "yes", rep(NA, 5)), 
+                       eu_before_may2004 = c(rep(NA, 6), "yes", rep(NA, 2)),
+                       eu_after_may2004 = c(rep(NA, 4), "yes", rep(NA, 4)), 
+                       cis = c(rep(NA, 2), "yes", rep(NA, 6)), 
+                       carinfonet = c(rep(NA, 5), "yes", rep(NA, 3)), 
+                       seehn = c(rep(NA, 7), "yes", rep(NA, 1)), 
+                       nordic = c(rep(NA, 1), "yes", rep(NA, 7)), 
+                       small = c(rep(NA, 8), "yes"))
+
+
+geo_lookup <- rbind(geo_lookup, scot_geo, group_geo)
 
 saveRDS(geo_lookup, paste0(data_folder, "Lookups/geo_lookup.rds"))
 saveRDS(geo_lookup, "data/geo_lookup.rds")
