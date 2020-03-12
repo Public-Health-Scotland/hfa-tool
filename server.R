@@ -212,4 +212,79 @@ function(input, output, session) {
       })
     }
   })
+  
+  ###############################################.        
+  #### Lucinda ----
+  ###############################################. 
+  
+  #####################.
+  # Reactive data 
+  #Time trend data. Filtering based on user input values.
+  trend_data_LL <- reactive({ 
+    
+    who_data %>% 
+      subset(country_name %in% input$country_trend1  & 
+               sex == input$sex) %>% 
+      droplevels() %>% 
+      arrange(year) #Needs to be sorted by year for Plotly
+  })
+  
+  #####################.
+  #Plot 
+  plot_trend_chart_LL <- function() {
+    #If no data available for that period then plot message saying data is missing
+    # Also if values is all NA
+    if (is.data.frame(trend_dataLL()) && nrow(trend_dataLL()) == 0  |
+        (all(is.na(trend_dataLL()$value)) == TRUE))
+    {
+      plot_nodata()
+    } else { #If data is available then plot it
+      
+      #Creating palette of colors: colorblind proof
+      #First obtaining length of each geography type, if more than 6, then 6, 
+      # this avoids issues. Extra selections will not be plotted
+      trend_lengthLL <- ifelse(length(input$country_trend1) > 12, 12, length(input$country_trend1))
+      
+      # First define the palette of colours used, then set a named vector, so each color
+      # gets assigned to an area. I think is based on the order in the dataset, which
+      # helps because Scotland is always first so always black.
+      trend_paletteLL <- c("#000000", "#a6cee3", "#1f78b4", "#b2df8a", "#33a02c", "#fb9a99",
+                         "#e31a1c", "#fdbf6f", "#ff7f00", "#cab2d6", "#6a3d9a", "#b15928")
+      
+      trend_scaleLL <- c(setNames(trend_paletteLL, unique(trend_data()$country_name)[1:trend_length]))
+      trend_colLL <- trend_scaleLL[1:trend_lengthLL]
+      
+      # Same approach for symbols
+      symbols_paletteLL <-  c('circle', 'diamond', 'circle', 'diamond', 'circle', 'diamond',
+                            'square','triangle-up', 'square','triangle-up', 'square','triangle-up')
+      symbols_scaleLL <- c(setNames(symbols_paletteLL, unique(trend_dataLL()$country_nameLL)[1:trend_lengthLL]))
+      symbols_trendLL <- symbols_scaleLL[1:trend_lengthLL]
+      
+      #Text for tooltip
+      tooltip_trendLL <- c(paste0(trend_dataLL()$country_name1, "<br>", trend_dataLL()$year,
+                                "<br>", paste0(unique(trend_dataLL()$measure_type)),": ", trend_dataLL()$value))
+      
+      #Creating time trend plot
+      trend_plotLL <- plot_ly(data=trend_dataLL(), x=~year,  y = ~value,
+                            color = ~country_name1, colors = trend_colLL, 
+                            text=tooltip_trendLL, hoverinfo="text", height = 600 ) %>% 
+        add_trace(type = 'scatter', mode = 'lines+markers', marker = list(size = 8),
+                  symbol = ~country_name1, symbols = symbols_trendLL) %>% 
+        #Layout 
+        layoutLL(annotations = list(), #It needs this because of a buggy behaviour of Plotly
+               margin = list(b = 160, t=5), #to avoid labels getting cut out
+               yaxis = list(title = unique(trend_dataLL()$measure_type), rangemode="tozero", fixedrange=TRUE,
+                            size = 4, titlefont =list(size=14), tickfont =list(size=14)),
+               xaxis = list(title = FALSE, tickfont =list(size=14), tickangle = 270, fixedrange=TRUE),
+               font = list(family = '"Helvetica Neue", Helvetica, Arial, sans-serif'),
+               showlegend = TRUE,
+               legend = list(orientation = 'h', x = 0, y = 1.18)) %>%  #legend on top
+        config(displayModeBar = FALSE, displaylogo = F) # taking out plotly logo button
+      
+    }
+  }
+  
+  output$trendLL <- renderPlot({
+    plot_trend_chart_LL()
+  })
 } #server end bracker
