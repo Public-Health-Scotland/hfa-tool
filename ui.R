@@ -20,6 +20,13 @@ tagList( #needed for shinyjs
                  includeCSS("www/styles.css"), #style sheet with CSS
                  HTML("<base target='_blank'>") # to make external links open a new tab
                ),
+             tabPanel("Lucinda", icon = icon("area-chart"), value = "lucinda",
+                      p("hello"),
+                      selectizeInput("country_trend1", "this is a description above drop down", 
+                                     choices = c("Select country" = "", paste(country_list)),
+                                     multiple=TRUE, selected = "United Kingdom")
+                      
+             ), #tab panel bracket
              tabPanel("Trend", icon = icon("area-chart"), value = "trend",
                       sidebarPanel(width=4,
                                    column(6,
