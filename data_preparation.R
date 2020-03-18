@@ -1,5 +1,8 @@
-# Extract data and metadata from WHO Europe health for all database
-# https://dw.euro.who.int/
+# Extract data and metadata from WHO Europe health for all database and combine
+# with Scotland's data prepared in the hfa-indicator-production repository.
+# URL WHO health for all: https://dw.euro.who.int/
+# Their database is only updated annually/every two years? so no need to run 
+# parts 1 ato 3 unless there has been a new release.
 
 # TODO:
 # Figure out if there is a better way through the API rather than 
@@ -10,6 +13,7 @@
 # Does the exclusion of urban and rural makes sense
 # Probabbly the techdoc with definitions will need to include the caveats for all countries
 # which could be shown in a similar way to the ind tech doc of the profiles tool
+# Mid year pop by sex needs to eb taken out
 
 # Endocrine, nutritional and metabolic diseases, all ages, per 100 000, by sex (age-standardized death rate)
 # needs to be
@@ -28,6 +32,8 @@ library(readr) #csv writing/reading
 library(janitor) #cleaning column names
 library(readxl) #Read excel files
 library(stringi) #for string manipulation
+library(data.table) # for reading csv's efficiently
+library(lubridate) # for dates
 
 if (sessionInfo()$platform %in% c("x86_64-redhat-linux-gnu (64-bit)", "x86_64-pc-linux-gnu (64-bit)")) {  
   data_folder <- "/PHI_conf/ScotPHO/HfA/Data/"
@@ -52,11 +58,12 @@ url_hfa <- who_hfa_metadata[["download_url"]]
 # Download zip file with all data and unzip
 temp <- tempfile() #create temporary folder
 download.file(url_hfa, temp)
-unzip(temp, exdir = data_folder) #unzip in data folder
+unzip(temp, exdir = paste0(data_folder, "WHO Data/")) #unzip in data folder
 unlink(temp) #delete temporary folder
 
 #Finds all the csv files containing data in the right format
-files <-  list.files(path = data_folder, pattern = "table", full.names = TRUE)
+files <-  list.files(path = paste0(data_folder, "WHO Data/"), pattern = "table", 
+                     full.names = TRUE)
 # To check files on folder
 View(file.info(files,  extra_cols = TRUE))
 
@@ -73,30 +80,19 @@ who_data <- do.call(bind_rows, lapply(files, read_csv, col_types = cols(.default
 table(who_data$yes_no) # few cases, not sure what to do with them
 
 ###############################################.
-# Check what indicators available for UK 
-ind_uk <- who_data %>% 
-  mutate(gbr = case_when(country_code == "GBR" ~ 1,
-                         TRUE ~ 0)) %>% 
-  select(ind_code, gbr) %>% unique() %>% 
-  group_by(ind_code) %>% 
-  summarise(gbr = max(gbr)) %>% 
-  mutate(index = as.numeric(substr(ind_code,5, 8)),
-         gbr = recode(gbr, "1" = "Yes", "0" = "No")) %>% 
-  arrange(index)
-
-write_csv(ind_uk, paste0(data_folder, "uk_ind_available.csv"))
-
+## Part 2 - Preparing lookups ----
 ###############################################.
 # Preparing geography lookup 
 # Reading country group mappings from metadata file
-country_groupings <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), 
+country_groupings <- read_excel(paste0(data_folder, "Lookups/HFA Metadata.xlsx"), 
                          sheet = "Country groups mapping", skip = 2,
                          col_names = c("short_name", "code", "who_euro", "eu_members", 
                                        "eu_before_may2004", "eu_after_may2004",
                                        "cis","carinfonet","seehn","nordic", 
                                        "small"))
 # Read country codes from metadata file
-geo_lookup <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Countries") %>% 
+geo_lookup <- read_excel(paste0(data_folder, "Lookups/HFA Metadata.xlsx"), 
+                         sheet = "Countries") %>% 
   clean_names #column names in lower case and with underscore
 
 # Merge them together
@@ -107,9 +103,33 @@ geo_lookup <- geo_lookup %>%
   rename(country_code = code, country_name = short_name) %>% 
   select(-c(iso_2:who_code, full_name))
 
-saveRDS(geo_lookup, paste0(data_folder, "geo_lookup.rds"))
+#Scotland geo information
+scot_geo <- data.frame(country_code = "SCO", country_name = "Scotland", 
+                       who_euro = "yes", eu_members = "yes", eu_before_may2004 = "yes", 
+  eu_after_may2004 = NA, cis = NA, carinfonet = NA, seehn = NA, 
+  nordic = NA, small = "yes")
+
+#country groupings info
+group_geo <- data.frame(country_code = c("WHO_EURO", "NORDIC", "CIS", "EU_MEMBERS", "EU_AFTER_MAY2004", 
+                                         "CARINFONET", "EU_BEFORE_MAY2004", "SEEHN", "SMALL"),
+                       country_name = c("WHO Europe", "Nordic countries", "CIS", "EU Members",
+                                        "EU after May 2004", "CARINFONET", 
+                                        "EU before May 2004", "SEEHN", "Small countries"),
+                       who_euro = c("yes", rep(NA, 8)), 
+                       eu_members = c(rep(NA, 3), "yes", rep(NA, 5)), 
+                       eu_before_may2004 = c(rep(NA, 6), "yes", rep(NA, 2)),
+                       eu_after_may2004 = c(rep(NA, 4), "yes", rep(NA, 4)), 
+                       cis = c(rep(NA, 2), "yes", rep(NA, 6)), 
+                       carinfonet = c(rep(NA, 5), "yes", rep(NA, 3)), 
+                       seehn = c(rep(NA, 7), "yes", rep(NA, 1)), 
+                       nordic = c(rep(NA, 1), "yes", rep(NA, 7)), 
+                       small = c(rep(NA, 8), "yes"))
+
+
+geo_lookup <- rbind(geo_lookup, scot_geo, group_geo)
+
+saveRDS(geo_lookup, paste0(data_folder, "Lookups/geo_lookup.rds"))
 saveRDS(geo_lookup, "data/geo_lookup.rds")
-geo_lookup <- readRDS(paste0(data_folder, "geo_lookup.rds"))
 
 ###############################################.
 # Preparing indicator lookup 
@@ -121,14 +141,19 @@ list_indicators <- fromJSON(list_indicators,simplifyDataFrame = TRUE)
 
 list_indicators <- left_join(list_indicators, ind_uk, by = c("code" = "measure_code"))
 
-write_csv(list_indicators, paste0(data_folder,"indicators_from_WHO_HFA.csv"))
+write_csv(list_indicators, paste0(data_folder,"Lookups/indicators_from_WHO_HFA.csv"))
 
 #Reading different parts of information about the indicators
-indlabels <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Labels", range = "A2:B613") %>% clean_names()
-indunittype <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Labels", range = "A616:B667") %>% clean_names()
-indclass <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Classifications") %>% clean_names()
-indunit <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Measure list") %>% clean_names()
-inddesc <- read_excel(paste0(data_folder, "HFA Metadata.xlsx"), sheet = "Measure notes") %>% 
+indlabels <- read_excel(paste0(data_folder, "Lookups/HFA Metadata.xlsx"), 
+                        sheet = "Labels", range = "A2:B613") %>% clean_names()
+indunittype <- read_excel(paste0(data_folder, "Lookups/HFA Metadata.xlsx"), 
+                          sheet = "Labels", range = "A616:B667") %>% clean_names()
+indclass <- read_excel(paste0(data_folder, "Lookups/HFA Metadata.xlsx"), 
+                       sheet = "Classifications") %>% clean_names()
+indunit <- read_excel(paste0(data_folder, "Lookups/HFA Metadata.xlsx"), 
+                      sheet = "Measure list") %>% clean_names()
+inddesc <- read_excel(paste0(data_folder, "Lookups/HFA Metadata.xlsx"), 
+                      sheet = "Measure notes") %>% 
   clean_names() %>% filter(is.na(country_code)) #only general descriptions/notes
 
 # notes relative to UK, for information mainly
@@ -147,13 +172,12 @@ indicator_lookup <- indicator_lookup %>%
          measure_type = unit, ind_code = code) %>% 
   select(ind_code, ind_name, description, domain, measure_type)
 
-saveRDS(indicator_lookup, paste0(data_folder, "indicator_lookup.rds"))
+saveRDS(indicator_lookup, paste0(data_folder, "Lookups/indicator_lookup.rds"))
 saveRDS(indicator_lookup, "data/indicator_lookup.rds")
 
-indicator_lookup <- readRDS(paste0(data_folder,"indicator_lookup.rds"))
-
 ###############################################.
-# Merging WHO data with metadata 
+## Part 3 - Merging WHO data with metadata  ----
+###############################################.
 who_data <- left_join(who_data, geo_lookup, by="country_code")
 who_data <- left_join(who_data, indicator_lookup, by="ind_code")
 
@@ -175,13 +199,13 @@ patterns_sex <- c(", by sex", ", males", ", females", ", female", ",females")
 # Cleaning the names and identifying duplicated indicators
 who_data <- who_data %>% 
   mutate(ind_basename = stri_replace_all_fixed(ind_name, 
-                                              pattern =patterns_change, 
+                                               pattern =patterns_change, 
                                                replacement = c(rep("", 7), "P", "D"), 
-                                              vectorize_all = FALSE),
+                                               vectorize_all = FALSE),
          ind_basesex = stri_replace_all_fixed(ind_name, 
-                                               pattern =patterns_sex, 
-                                               replacement = c(rep("", 5)), 
-                                               vectorize_all = FALSE))
+                                              pattern =patterns_sex, 
+                                              replacement = c(rep("", 5)), 
+                                              vectorize_all = FALSE))
 
 # Identifiying indicators by sex which information is already in the overall one
 # If they only have one sex and their name has changed is to be excluded.
@@ -195,21 +219,63 @@ who_data <- who_data %>% filter(!(ind_name %in% ind_to_exclude)) %>%
   select(-ind_basesex, -ind_name) %>% 
   rename(ind_name = ind_basename)
 
-saveRDS(who_data, paste0(data_folder, "WHO_HFA_data.rds"))
-saveRDS(who_data, "data/WHO_HFA_data.rds")
-
-who_data <- readRDS(paste0(data_folder,"WHO_HFA_data.rds"))
+saveRDS(who_data, paste0(data_folder, "WHO Data/WHO_HFA_data.rds"))
 
 ###############################################.
-## Scotland data ----
+# Check what indicators available for UK 
+ind_uk <- who_data %>% 
+  mutate(gbr = case_when(country_code == "GBR" ~ 1,
+                         TRUE ~ 0)) %>% 
+  select(ind_code, gbr) %>% unique() %>% 
+  group_by(ind_code) %>% 
+  summarise(gbr = max(gbr)) %>% 
+  mutate(index = as.numeric(substr(ind_code,5, 8)),
+         gbr = recode(gbr, "1" = "Yes", "0" = "No")) %>% 
+  arrange(index)
+
+write_csv(ind_uk, paste0(data_folder, "Lookups/uk_ind_available.csv"))
+
 ###############################################.
+## Part 4 - Prepare Scotland data ----
+###############################################.
+# Creating backup
+whoscot_data <- readRDS(whoscot_data, "data/WHO_Scot_data.rds")
+saveRDS(whoscot_data, paste0(data_folder, "Backups/WHO_Scot_backup_data_", today() ,".rds"))
 
-scot_data <- read_excel(paste0(data_folder, "HFA19UK_Scotland_completed.xlsx"), 
-                        sheet = "HFA19GB_Scotland", range = "A2:AZ164") %>% clean_names()
+#Finds all the csv files in the shiny folder
+files_scot <-  list.files(path = paste0(data_folder, "Scotland Data"), 
+                          pattern = "*.csv", full.names = TRUE)
+# To check dates of update of each file and who did it
+View(file.info(files_scot,  extra_cols = TRUE))
 
-# This is the data for Scotland received from ONS
-scot_data <- scot_data %>% filter(!(is.na(x2017)) | !(is.na(x2018))) %>% 
-  select(indicator_title, pop_group, x2017, x2018)
+# reads the data and combines it, variables to lower case and variable with filename
+scot_data <- do.call(rbind, lapply(files_scot, function(x){
+  fread(x)[,file_name:= x] %>% clean_names() })) %>%
+  mutate(file_name = gsub(paste0(data_folder, "Scotland Data/"), "", file_name),
+         country_code = "SCO") %>% 
+  rename(ind_code = ind_id)
 
+# # to check if there is more then one file for the same indicator. This should be empty
+scot_data %>% select(ind_id, file_name) %>% unique %>% group_by(ind_id) %>%
+  add_tally() %>% filter(n >1) %>% View()
 
-  ##END
+# Merge with lookups
+indicator_lookup <- readRDS(paste0(data_folder,"Lookups/indicator_lookup.rds"))
+geo_lookup <- readRDS(paste0(data_folder, "Lookups/geo_lookup.rds"))
+
+scot_data <- left_join(scot_data, geo_lookup, by = "country_code")
+scot_data <- left_join(scot_data, indicator_lookup, by = "ind_code")
+
+scot_data <- scot_data %>% # Taking out some columns
+  select(-c(ind_code, country_code, who_euro:small, description, domain, file_name))
+
+###############################################.
+## Merging WHO and Scotland data ----
+whoscot_data <- rbind(scot_data, who_data)
+
+saveRDS(whoscot_data, paste0(data_folder, "WHO Data/WHO_Scot_data.rds"))
+saveRDS(whoscot_data, "data/WHO_Scot_data.rds")
+
+whoscot_data <- readRDS(paste0(data_folder,"WHO Data/WHO_Scot_data.rds"))
+
+##END
