@@ -78,16 +78,16 @@ tagList( #needed for shinyjs
                                  ))),
                       
                       
-                      column(3,
-                             div(title="Select sex",
-                                 p(tags$b("sex selection")),
-                                 id='SexMap',
-                                 selectInput(inputId = "SexMap",
-                                             label= NULL,
-                                             choices =  c("Select Sex", unique(Sex))#,
+                      #column(3,
+                             #div(title="Select sex",
+                                 #p(tags$b("sex selection")),
+                                 #id='SexMap',
+                                 #selectInput(inputId = "SexMap",
+                                             #label= NULL,
+                                             #choices =  c("Select Sex", unique(Sex))#,
                                              #selectize = TRUE,
                                              #selected = "NULL"
-                                 ))),
+                                 #))),
                       
                       # This is the actual map. Produced in Server.R
                       mainPanel(width = 12,

@@ -167,12 +167,12 @@ function(input, output, session) {
           leaflet("mapfunction")
         } 
         
-        else{
-          observeEvent(input$SexMap, {
+        #else{
+          #observeEvent(input$SexMap, {
             
-            if("Select Sex" %in% input$SexMap) {
-              leaflet("mapfunction")
-            } 
+            #if("Select Sex" %in% input$SexMap) {
+              #leaflet("mapfunction")
+            #} 
             
             else {
               

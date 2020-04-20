@@ -81,7 +81,7 @@ Indicator <- sort(unique(who_data$ind_name))
 
 Year <- sort(unique(who_data$year))
 
-Sex <- sort(unique(who_data$sex))
+#Sex <- sort(unique(who_data$sex))
 
 # add UK shapefile
 # shapefile_uk = readOGR(dsn=".", layer="infuse_ctry_2011")
