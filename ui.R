@@ -23,7 +23,6 @@ tagList( #needed for shinyjs
              tabPanel("Trend", icon = icon("area-chart"), value = "trend",
                       sidebarPanel(width=4,
                                    column(6,
-                                          actionButton("browser", "Browser"),
                                           actionButton("help_trend",label="Help", icon= icon('question-circle'), class ="down")),
                                    column(6,
                                           actionButton("defs_trend", label="Definitions", icon= icon('info'), class ="down")),
@@ -50,7 +49,9 @@ tagList( #needed for shinyjs
              tabPanel("Populate a Map", #map tab panel
                       id="map",
                       icon = icon("globe"),
-                      
+                      # LAURA - this will temporarily stop the app and let you investigate how it looks
+                      # at that point in time with whatever options you have chosen
+                      actionButton("browser", "Browser"),
                       # Map tab -----------------------------------------------------------------
                       
                       # Filter for indicator

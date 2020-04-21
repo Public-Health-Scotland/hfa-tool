@@ -5,6 +5,9 @@
 
 # Define server logic required to draw a histogram
 function(input, output, session) {
+  # LAURA - this will temporarily stop the app and let you investigate how it looks
+  # at that point in time with whatever options you have chosen. So you could look at the 
+  # reactive datasets and other outputs
   observeEvent(input$browser, browser())
   
   ###############################################.        
@@ -145,6 +148,10 @@ function(input, output, session) {
   #### Mapping ----
   ###############################################.
   
+  ## LAURA - I am not convinced having an empty map until users select all options
+  # is desirable. From our user testing, people prefer to have something displayed
+  # and then mess around with the filters themselves.
+  # Changing this means probably getting rid of the leafletProxy/observeEvent bit.
   output$mapfunction <- renderLeaflet({
     leaflet(options = leafletOptions(zoomControl = FALSE,
                                      minZoom = 1,maxZoom = 8)) %>%
@@ -175,7 +182,12 @@ function(input, output, session) {
             #} 
             
             else {
-              
+          ## LAURA - This data doesn't have a one to one match with the shapefile
+              # for most indicators there are three rows
+              # The best way to test these things would be to move the who_data map 
+              # outside this as a reactive an then using the browsing function explore how the data looks
+              # and what happens when you merge it with the shapefile
+              # For fixing this temporarily you could add to the filter command: sex == "All"
               who_data_map <- who_data %>% 
                 filter(ind_name == input$IndicatorMap,
                        year == input$YearMap)
@@ -209,7 +221,6 @@ function(input, output, session) {
             }
           })
         }
-      })
-    }
-  })
+      }) #observe event end
+
 } #server end bracker

@@ -73,6 +73,8 @@ plot_nodata <- function(height_plot = 450) {
 ## Map related code ----
 ############################.
 
+# LAURA - move this to the data prepration. save the shapefile as an rds file and 
+# load here as rds, much faster
 #load map - used http://mapshaper.org/ to make map less detailed
 shapefile_europe = readOGR(dsn=".", layer="shapefile_europe") # opens up the simpleHB layer of the Shapefile
 shapefile_europe <- spTransform(shapefile_europe, CRS("+init=epsg:4326"))
