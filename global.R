@@ -36,7 +36,7 @@ library(plotly)
 ############################.
 ##Data ----
 ############################.
-who_data <- readRDS("data/WHO_HFA_data.rds")
+who_data <- readRDS("data/WHO_Scot_data.rds")
 geo_lookup <- readRDS("data/geo_lookup.rds")
 ind_lookup <- readRDS("data/indicator_lookup.rds")
 
