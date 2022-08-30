@@ -123,7 +123,7 @@ function(input, output, session) {
     }
   }
   # Creating plot for ui side
-  output$trend_plot <- renderPlotly({ plot_trend_chart()  }) 
+  output$trend_plot <- renderPlotly( plot_trend_chart()  ) 
   
   #####################.
   # Downloading data and plot

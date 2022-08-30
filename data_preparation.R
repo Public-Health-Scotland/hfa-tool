@@ -219,14 +219,19 @@ patterns_change <- c(", per 100 000", " per 100 000",
 patterns_sex <- c(", by sex", ", males", ", females", ", female", ",females")
 
 # Cleaning the names and identifying duplicated indicators
-who_data <- who_data %>% 
-  mutate(ind_basename = stri_replace_all_fixed(ind_name, 
-                                               pattern =patterns_change, 
-                                               replacement = c(rep("", 7), "P", "D"), 
-                                               vectorize_all = FALSE),
-         ind_basesex = stri_replace_all_fixed(ind_name, 
-                                              pattern =patterns_sex, 
-                                              replacement = c(rep("", 5)), 
+# who_data <- who_data %>% 
+#   mutate(ind_basename = stri_replace_all_fixed(ind_name, 
+#                                                pattern =patterns_change, 
+#                                                replacement = c(rep("", 7), "P", "D"), 
+#                                                vectorize_all = FALSE),
+# ind_basesex = stri_replace_all_fixed(ind_name,
+#                                      pattern =patterns_sex,
+#                                      replacement = c(rep("", 5)),
+#                                      vectorize_all = FALSE))
+who_data_unfiltered <- who_data %>% 
+  mutate(ind_name = stri_replace_all_fixed(ind_name, 
+                                              pattern =patterns_sex,
+                                              replacement = c(rep("", 5)),
                                               vectorize_all = FALSE))
 
 # Identifiying indicators by sex which information is already in the overall one
@@ -242,9 +247,10 @@ who_data <- who_data %>% filter(!(ind_name %in% ind_to_exclude)) %>%
   rename(ind_name = ind_basename)
 
 saveRDS(who_data, paste0(data_folder, "WHO Data/2021/WHO_HFA_data.rds"))
+saveRDS(who_data_unfiltered, paste0(data_folder, "WHO Data/2021/WHO_HFA_data_unfiltered.rds"))
 
-
-
+who_data <- read_rds(paste0(data_folder, "WHO Data/2021/WHO_HFA_data.rds"))
+who_data_unfiltered <- read_rds(paste0(data_folder, "WHO Data/2021/WHO_HFA_data_unfiltered.rds"))
 ###############################################.
 ## Part 4 - Prepare Scotland data ----
 ###############################################.
@@ -254,20 +260,25 @@ saveRDS(whoscot_data, paste0(data_folder, "Backups/WHO_Scot_backup_data_", today
 
 #Finds all the csv files in the shiny folder
 files_scot <-  list.files(path = paste0(data_folder, "Scotland Data"), 
-                          pattern = "*.csv", full.names = TRUE)
+                          pattern = "*.rds", full.names = TRUE)
 # To check dates of update of each file and who did it
 View(file.info(files_scot,  extra_cols = TRUE))
 
 # reads the data and combines it, variables to lower case and variable with filename
-scot_data <- do.call(rbind, lapply(files_scot, function(x){
-  fread(x)[,file_name:= x] %>% clean_names() })) %>%
-  mutate(file_name = gsub(paste0(data_folder, "Scotland Data/"), "", file_name),
-         country_code = "SCO") %>% 
-  rename(ind_code = ind_id)
+# scot_data <- do.call(rbind, lapply(files_scot, function(x){
+#   fread(x)[,file_name:= x] %>% clean_names() })) %>%
+#   mutate(file_name = gsub(paste0(data_folder, "Scotland Data/"), "", file_name),
+#          country_code = "SCO") %>% 
+#   rename(ind_code = ind_id)
+
+scot_data <- do.call(bind_rows, lapply(files_scot, read_rds)) %>% 
+  clean_names() %>% 
+  rename(ind_code = ind_id) %>% 
+  mutate(country_code = "SCO")
 
 # # to check if there is more then one file for the same indicator. This should be empty
-scot_data %>% select(ind_code, file_name) %>% unique %>% group_by(ind_code) %>%
-  add_tally() %>% filter(n >1) %>% View()
+# scot_data %>% select(ind_code, file_name) %>% unique %>% group_by(ind_code) %>%
+#   add_tally() %>% filter(n >1) %>% View()
 
 # Merge with lookups
 indicator_lookup <- readRDS(paste0(data_folder,"Lookups/indicator_lookup.rds"))
@@ -277,15 +288,30 @@ scot_data <- left_join(scot_data, geo_lookup, by = "country_code")
 scot_data <- left_join(scot_data, indicator_lookup, by = "ind_code")
 
 scot_data <- scot_data %>% # Taking out some columns
-  select(-c(country_code, who_euro:small, description, domain, file_name))
+  select(ind_code, sex, year, value, country_name, description, domain, measure_type, ind_name)
 
 ###############################################.
 ## Merging WHO and Scotland data ----
 whoscot_data <- rbind(scot_data, who_data, fill = TRUE)
+whoscot_data_unfiltered <- rbind(scot_data, who_data_unfiltered, fill = TRUE)
 
-saveRDS(whoscot_data, paste0(data_folder, "WHO Data/WHO_Scot_data.rds"))
+
+saveRDS(whoscot_data, paste0(data_folder, "WHO Data/2021/WHO_Scot_data.rds"))
 saveRDS(whoscot_data, "data/WHO_Scot_data.rds")  
 
-whoscot_data <- readRDS(paste0(data_folder,"WHO Data/WHO_Scot_data.rds")) # not needed 
+saveRDS(whoscot_data_unfiltered, paste0(data_folder, "WHO Data/2021/WHO_Scot_data_unfiltered.rds"))
+saveRDS(whoscot_data_unfiltered, "data/WHO_Scot_data_unfiltered.rds") 
+
+whoscot_data <- readRDS(paste0(data_folder,"WHO Data/WHO_Scot_data.rds")) 
 
 ##END
+
+
+
+testing_sex_of_indicators <- who_data_unfiltered %>% 
+  filter(ind_code %in% scot_indicators) %>% 
+  filter(sex %in% c("Male", "Female"))
+
+indicators_by_sex <- unique(testing_sex_of_indicators$ind_code)
+
+indicators_by_sex
