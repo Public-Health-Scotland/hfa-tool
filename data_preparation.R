@@ -290,10 +290,16 @@ scot_data <- left_join(scot_data, indicator_lookup, by = "ind_code")
 scot_data <- scot_data %>% # Taking out some columns
   select(ind_code, sex, year, value, country_name, description, domain, measure_type, ind_name)
 
+scot_indicators <- unique(scot_data$ind_code)
+
 ###############################################.
 ## Merging WHO and Scotland data ----
 whoscot_data <- rbind(scot_data, who_data, fill = TRUE)
 whoscot_data_unfiltered <- rbind(scot_data, who_data_unfiltered, fill = TRUE)
+
+whoscot_data_scot_indicators <- who_data_unfiltered %>% 
+  filter(ind_code %in% scot_indicators) %>% 
+  rbind(scot_data)
 
 
 saveRDS(whoscot_data, paste0(data_folder, "WHO Data/2021/WHO_Scot_data.rds"))

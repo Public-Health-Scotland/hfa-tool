@@ -118,12 +118,12 @@ function(input, output, session) {
                font = list(family = '"Helvetica Neue", Helvetica, Arial, sans-serif'),
                showlegend = TRUE,
                legend = list(orientation = 'h', x = 0, y = 1.18)) %>%  #legend on top
-        config(displayModeBar = FALSE, displaylogo = F) # taking out plotly logo button
+        plotly::config(displayModeBar = FALSE, displaylogo = F) # taking out plotly logo button
       
     }
   }
   # Creating plot for ui side
-  output$trend_plot <- renderPlotly( plot_trend_chart()  ) 
+  output$trend_plot <- renderPlotly({ plot_trend_chart()  }) 
   
   #####################.
   # Downloading data and plot
